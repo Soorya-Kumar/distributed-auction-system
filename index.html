@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Distributed Auction System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* Page */
+        body {
+            background-color: #343434; /* overall page black */
+            color: #fff;            /* main text white */
+            font-family: "Courier New", Courier, monospace;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; }
+
+        header { text-align: center; margin-bottom: 20px; }
+        h1 { font-size: 1.6em; color: #fff; margin-bottom: 6px; }
+        .subtitle { color: #ddd; font-size: 0.95em; }
+
+        /* Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        /* Boxes should be white with thin borders */
+        .card {
+            background-color: #fff;   /* box background white */
+            color: #000;              /* box text black for readability */
+            border: 1px solid #ccc;   /* thin border */
+            padding: 12px;
+            border-radius: 2px;
+        }
+
+        .card h2 {
+            color: #000;
+            font-size: 1.05em;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #fff; /* label outside boxes stays white when visible on black - overridden inside .card */
+            font-weight: bold;
+        }
+
+        /* Ensure inputs inside white boxes show black text */
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            background: #fff;
+            color: #000;
+            border: 1px solid #ccc;
+            margin-bottom: 8px;
+            font-family: "Courier New", Courier, monospace;
+        }
+
+        input:focus { outline: none; border-color: #999; }
+
+        /* Buttons kept simple and white box styled */
+        button {
+            padding: 8px;
+            background-color: #fff;
+            color: #000;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        button:hover { background-color: #f7f7f7; }
+
+        /* Message boxes: success uses dark/neutral, error is red as requested */
+        .message { margin-top: 10px; font-size: 14px; }
+
+        .message.success {
+            background: #fff;
+            color: #000;
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        .message.error {
+            background: transparent;
+            color: #ff3333;      /* error text red */
+            border: 1px solid rgba(255,51,51,0.15);
+            padding: 8px;
+        }
+
+        /* Status / auction id displays should also be white boxes */
+        .status-display,
+        .auction-id-display {
+            margin-top: 10px;
+            background: #fff;
+            color: #000;
+            border: 1px solid #ccc;
+            padding: 10px;
+            word-break: break-all;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dotted #e6e6e6;
+            color: #000;
+        }
+        .status-item:last-child { border-bottom: none; }
+
+        .auction-id-label { font-weight: 700; color: #000; }
+        .auction-id-value { color: #111; }
+
+        /* Loading spinner (white ring, red top for error-ish accent) */
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #fff;
+            border-top: 2px solid #ff3333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0%{transform:rotate(0)}100%{transform:rotate(360deg)} }
+
+        /* Placeholder color */
+        input::placeholder { color: #999; }
+
+        /* Override label color inside white cards so label text is readable */
+        .card label { color: #000; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Distributed Auction System</h1>
+            <p class="subtitle">Real-time Bidding with Distributed Consensus</p>
+        </header>
+
+        <div class="grid">
+            <!-- Create Auction -->
+            <div class="card">
+                <h2>Create Auction</h2>
+                <form onsubmit="createAuction(event)">
+                    <label>Item Name</label>
+                    <input type="text" id="itemName" required placeholder="e.g., Vintage Watch">
+
+                    <label>Starting Price ($)</label>
+                    <input type="number" id="startingPrice" step="0.01" required placeholder="e.g., 100">
+
+                    <label>Duration (seconds)</label>
+                    <input type="number" id="duration" required placeholder="e.g., 300">
+
+                    <button type="submit" id="createBtn">Create Auction</button>
+                </form>
+                <div id="createMessage" class="message"></div>
+                <div id="auctionIdDisplay" class="auction-id-display" style="display:none"></div>
+            </div>
+
+            <!-- Place Bid -->
+            <div class="card">
+                <h2>Place Bid</h2>
+                <form onsubmit="placeBid(event)">
+                    <label>Auction ID</label>
+                    <input type="text" id="bidAuctionId" required placeholder="Paste auction ID">
+
+                    <label>Your Name</label>
+                    <input type="text" id="bidderId" required placeholder="e.g., Alice">
+
+                    <label>Bid Amount ($)</label>
+                    <input type="number" id="bidAmount" step="0.01" required placeholder="e.g., 150">
+
+                    <button type="submit" id="bidBtn">Place Bid</button>
+                </form>
+                <div id="bidMessage" class="message"></div>
+            </div>
+
+            <!-- Check Status -->
+            <div class="card">
+                <h2>Check Status</h2>
+                <form onsubmit="checkStatus(event)">
+                    <label>Auction ID</label>
+                    <input type="text" id="statusAuctionId" required placeholder="Paste auction ID">
+
+                    <button type="submit" id="statusBtn">Check Status</button>
+                </form>
+                <div id="statusMessage" class="message"></div>
+                <div id="statusDisplay" class="status-display" style="display:none"></div>
+            </div>
+
+            <!-- Close Auction -->
+            <div class="card">
+                <h2>Close Auction</h2>
+                <form onsubmit="closeAuction(event)">
+                    <label>Auction ID</label>
+                    <input type="text" id="closeAuctionId" required placeholder="Paste auction ID">
+
+                    <button type="submit" id="closeBtn">Close Auction</button>
+                </form>
+                <div id="closeMessage" class="message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lastAuctionId = '';
+
+        async function createAuction(event) {
+            event.preventDefault();
+            const btn = document.getElementById('createBtn');
+            const messageDiv = document.getElementById('createMessage');
+            const auctionIdDiv = document.getElementById('auctionIdDisplay');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Creating<span class="loading"></span>';
+            messageDiv.innerHTML = '';
+            auctionIdDiv.style.display = 'none';
+            auctionIdDiv.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('itemName', document.getElementById('itemName').value);
+            formData.append('startingPrice', document.getElementById('startingPrice').value);
+            formData.append('duration', document.getElementById('duration').value);
+
+            try {
+                const response = await fetch('/api/create', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success) {
+                    lastAuctionId = data.auctionId;
+                    messageDiv.className = 'message success';
+                    messageDiv.innerHTML = `${data.message || 'Auction created.'}`;
+                    auctionIdDiv.style.display = 'block';
+                    auctionIdDiv.innerHTML = `
+                        <div class="auction-id-label">Auction ID:</div>
+                        <div class="auction-id-value">${data.auctionId}</div>
+                    `;
+                    event.target.reset();
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.innerHTML = `${data.message || 'Failed to create auction.'}`;
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.innerHTML = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Create Auction';
+            }
+        }
+
+        async function placeBid(event) {
+            event.preventDefault();
+            const btn = document.getElementById('bidBtn');
+            const messageDiv = document.getElementById('bidMessage');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Placing<span class="loading"></span>';
+            messageDiv.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('auctionId', document.getElementById('bidAuctionId').value);
+            formData.append('bidderId', document.getElementById('bidderId').value);
+            formData.append('amount', document.getElementById('bidAmount').value);
+
+            try {
+                const response = await fetch('/api/bid', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success) {
+                    messageDiv.className = 'message success';
+                    const current = (typeof data.currentHighestBid === 'number') ? `$${data.currentHighestBid.toFixed(2)}` : '';
+                    messageDiv.innerHTML = `${data.message || 'Bid placed.'}${current ? '<br>Current highest bid: ' + current : ''}`;
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.innerHTML = `${data.message || 'Bid failed.'}`;
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.innerHTML = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Place Bid';
+            }
+        }
+
+        async function checkStatus(event) {
+            event.preventDefault();
+            const btn = document.getElementById('statusBtn');
+            const messageDiv = document.getElementById('statusMessage');
+            const displayDiv = document.getElementById('statusDisplay');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Checking<span class="loading"></span>';
+            messageDiv.innerHTML = '';
+            displayDiv.style.display = 'none';
+            displayDiv.innerHTML = '';
+
+            const auctionId = document.getElementById('statusAuctionId').value;
+
+            try {
+                const response = await fetch(`/api/status?auctionId=${encodeURIComponent(auctionId)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const endDate = new Date((data.endTime || 0) * 1000);
+                    displayDiv.style.display = 'block';
+                    displayDiv.innerHTML = `
+                        <div class="status-item"><span>Item:</span><span>${data.itemName || ''}</span></div>
+                        <div class="status-item"><span>Status:</span><span>${data.status || ''}</span></div>
+                        <div class="status-item"><span>Current Bid:</span><span>${typeof data.currentHighestBid === 'number' ? '$' + data.currentHighestBid.toFixed(2) : '$0.00'}</span></div>
+                        <div class="status-item"><span>Highest Bidder:</span><span>${data.highestBidder || 'None'}</span></div>
+                        <div class="status-item"><span>Ends At:</span><span>${endDate.toLocaleString()}</span></div>
+                    `;
+                    messageDiv.className = 'message success';
+                    messageDiv.innerHTML = 'Status loaded.';
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.innerHTML = `${data.message || 'Failed to load status.'}`;
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.innerHTML = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Check Status';
+            }
+        }
+
+        async function closeAuction(event) {
+            event.preventDefault();
+            const btn = document.getElementById('closeBtn');
+            const messageDiv = document.getElementById('closeMessage');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Closing<span class="loading"></span>';
+            messageDiv.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('auctionId', document.getElementById('closeAuctionId').value);
+
+            try {
+                const response = await fetch('/api/close', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success) {
+                    messageDiv.className = 'message success';
+                    const win = typeof data.winningBid === 'number' ? ` $${data.winningBid.toFixed(2)}` : '';
+                    messageDiv.innerHTML = `${data.message || 'Auction closed.'}${data.winnerId ? `<br>Winner: ${data.winnerId}${win}` : ''}`;
+                    event.target.reset();
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.innerHTML = `${data.message || 'Failed to close auction.'}`;
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.innerHTML = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Close Auction';
+            }
+        }
+    </script>
+</body>
+</html>

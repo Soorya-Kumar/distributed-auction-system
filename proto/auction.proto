@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package auction;
+
+option go_package = "./proto";
+
+// Auction service for client operations
+service AuctionService {
+  rpc CreateAuction(CreateAuctionRequest) returns (CreateAuctionResponse);
+  rpc PlaceBid(PlaceBidRequest) returns (PlaceBidResponse);
+  rpc CloseAuction(CloseAuctionRequest) returns (CloseAuctionResponse);
+  rpc GetAuctionStatus(GetAuctionStatusRequest) returns (GetAuctionStatusResponse);
+}
+
+// Node-to-node communication service
+service NodeService {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ReplicateState(ReplicateStateRequest) returns (ReplicateStateResponse);
+  rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse);
+}
+
+// Client-facing messages
+message CreateAuctionRequest {
+  string item_name = 1;
+  double starting_price = 2;
+  int64 duration_seconds = 3;
+}
+
+message CreateAuctionResponse {
+  string auction_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message PlaceBidRequest {
+  string auction_id = 1;
+  string bidder_id = 2;
+  double amount = 3;
+}
+
+message PlaceBidResponse {
+  bool success = 1;
+  string message = 2;
+  double current_highest_bid = 3;
+}
+
+message CloseAuctionRequest {
+  string auction_id = 1;
+}
+
+message CloseAuctionResponse {
+  bool success = 1;
+  string message = 2;
+  string winner_id = 3;
+  double winning_bid = 4;
+}
+
+message GetAuctionStatusRequest {
+  string auction_id = 1;
+}
+
+message GetAuctionStatusResponse {
+  string auction_id = 1;
+  string item_name = 2;
+  double current_highest_bid = 3;
+  string highest_bidder = 4;
+  string status = 5;
+  int64 end_time = 6;
+}
+
+// Node-to-node messages
+message HeartbeatRequest {
+  string node_id = 1;
+  int64 term = 2;
+  bool is_leader = 3;
+}
+
+message HeartbeatResponse {
+  bool success = 1;
+  int64 term = 2;
+}
+
+message ReplicateStateRequest {
+  string node_id = 1;
+  int64 term = 2;
+  repeated AuctionState auctions = 3;
+}
+
+message ReplicateStateResponse {
+  bool success = 1;
+}
+
+message RequestVoteRequest {
+  string candidate_id = 1;
+  int64 term = 2;
+}
+
+message RequestVoteResponse {
+  bool vote_granted = 1;
+  int64 term = 2;
+}
+
+// Auction state representation
+message AuctionState {
+  string auction_id = 1;
+  string item_name = 2;
+  double starting_price = 3;
+  double current_highest_bid = 4;
+  string highest_bidder = 5;
+  int64 created_at = 6;
+  int64 end_time = 7;
+  string status = 8; // ACTIVE, CLOSED
+  repeated Bid bid_history = 9;
+}
+
+message Bid {
+  string bidder_id = 1;
+  double amount = 2;
+  int64 timestamp = 3;
+}
